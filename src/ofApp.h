@@ -42,6 +42,9 @@ public:
     void mouseMoved(int x, int y);
     void mouseReleased(int x, int y, int button);
 
+
+    void stopPlayer();
+    void togglePlayer();
     void nextVideo();
     void previousVideo();
 
@@ -57,7 +60,6 @@ public:
     int _selectedNdiDevice;
 
 
-    bool _loopVideos;
     std::vector<ofPoint> _points;
     std::vector<ofColor> _oldLedPixels;
     std::vector<ofColor> _newLedPixels;
@@ -91,6 +93,7 @@ public:
     void onSerialBuffer(const ofxIO::SerialBufferEventArgs &args);
     void onSerialError(const ofxIO::SerialBufferErrorEventArgs &args);
 
+    void onModeChange(int & mode);
     void onMuteChange(bool & value);
     void onLoopChange(bool & value);
 };

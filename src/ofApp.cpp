@@ -6,9 +6,11 @@ ofApp::ofApp()
     ofSetWindowTitle("luce diretta");
     ofSetFrameRate(60);
 
-    _videoPlayer.setLoopState(ofLoopType::OF_LOOP_NONE);
     loadMask("mask.svg");
     _drawMask.set("draw mask", false);
+
+    _mode.addListener(this, &ofApp::onModeChange);
+    _mode.set("mode", INPUTMODE::INPUTMODE_VIDEOPLAYER, 0, _modeLabels.size());
     _mute.addListener(this, &ofApp::onMuteChange);
     _mute.set("mute", false);
     _loop.addListener(this, &ofApp::onLoopChange);
@@ -31,12 +33,13 @@ ofApp::ofApp()
     if (file.exists())
     {
         file >> _config;
-        ofLogNotice("led animation toolkit") << "successfully loaded config";
+        ofLogNotice("") << "successfully loaded config";
         ofLogNotice() << _config.dump(2);
     }
 
-    _modeLabels.push_back("NDI");
-    _modeLabels.push_back("video");
+    _modeLabels.push_back("NDI grabber");
+    _modeLabels.push_back("video player");
+    _modeLabels.push_back("video grabber");
 
 
     updateSerialDeviceList();
@@ -50,7 +53,6 @@ ofApp::~ofApp()
 
 void ofApp::setup()
 {
-    // Set Window Size
     ofSetWindowShape(1024, 768);
 
     ofDirectory dir("videos");
@@ -70,7 +72,6 @@ void ofApp::setup()
         _videoPlayer.setLoopState(OF_LOOP_NONE);
     }
 
-    _mode.set("mode", INPUTMODE::INPUTMODE_VIDEOPLAYER, 0, _modeLabels.size());
     setupGui();
     connectToArduino();
 }
@@ -127,6 +128,24 @@ void ofApp::update()
             }
         }
     }
+    else if (_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER)
+    {
+        _videoGrabber.update();
+        if (_videoGrabber.isFrameNew())
+        {
+            isNewFrame = true;
+            for (auto i = 0; i < _points.size(); i++)
+            {
+                auto point = _points[i];
+                auto color = _videoGrabber.getPixels().getColor(_videoGrabber.getWidth() * point.x, _videoGrabber.getHeight() * point.y);
+                int r = color.r;
+                int g = color.g;
+                int b = color.b;
+
+                _newLedPixels[i] = color;
+            }
+        }
+    }
 
     if (isNewFrame)
     {
@@ -137,9 +156,12 @@ void ofApp::update()
 void ofApp::draw()
 {
     ofPushMatrix();
-    ofTranslate(532, 112);
+    auto x = ofGetWidth()/2;
+    auto y = 112;
+    auto padding = ofGetWidth()*0.01;
+    ofTranslate(x+padding, y);
 
-    auto width = ofGetWidth() - 572;
+    auto width = ofGetWidth()/2 - 2*padding;
     auto height = 0;
 
     int vX = 0;
@@ -156,6 +178,7 @@ void ofApp::draw()
     {
         height = (_videoPlayer.getHeight() / _videoPlayer.getWidth()) * width;
         _videoPlayer.draw(0, 0, width, height);
+        ofDrawRectangle(0, height+5, _videoPlayer.getPosition()*width, 10);
     }
     // cout << height << "\n" ;
     ofPopMatrix();
@@ -166,7 +189,7 @@ void ofApp::draw()
     {
         ofPushStyle();
         ofPushMatrix();
-        ofTranslate(532, 112);
+        ofTranslate(x, y);
 
         for (auto i = 0; i < _points.size(); i++)
         {
@@ -192,8 +215,11 @@ void ofApp::draw()
 
         gui.begin();
         auto settings = ofxImGui::Settings();
-        auto offset = 10;
-        ImGui::SetNextWindowPos(glm::vec2(offset, offset)); 
+        auto offset = padding;
+        auto winPosition = glm::vec2(offset, offset);
+        auto winSize = glm::vec2(0, 0);
+
+        ImGui::SetNextWindowPos(winPosition); 
         ImGui::SetNextWindowSize(glm::vec2(ofGetWidth() - 2*offset, 0)); 
         if (ImGui::Begin("I/O")){
             if (ImGui::BeginCombo("mode", _modeLabels[_mode].c_str()))
@@ -240,34 +266,37 @@ void ofApp::draw()
 
             // ImGui::SameLine();
             // ofxImGui::AddParameter(_drawMask);
+            winSize = ImGui::GetWindowSize();
             ImGui::End();
         }
 
 
 
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            // ImGui::SetNextWindowPos(glm::vec2(offset, offset*10)); 
-            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/3 - 2*offset, 0)); 
+            ImGui::SetNextWindowPos(glm::vec2(offset, winPosition.y + winSize.y + offset)); 
+            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/2 - 2*offset, 0)); 
             if (ImGui::Begin("library")){
                 std::vector<std::string> videoLabels;
                 for(auto & file : _videoFiles){
                     videoLabels.push_back(ofFilePath::getBaseName(file));
                 }
+                ImGui::PushItemWidth(ImGui::GetWindowContentRegionWidth());
                 if(ofxImGui::VectorListBox("", &_selectedVideoIndex, videoLabels)){
                     ofLogNotice("TODO") << "trigger video " << _selectedVideoIndex;
                     loadVideoByIndex(_selectedVideoIndex, false);
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::End();
         }
 
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            // ImGui::SetNextWindowPos(glm::vec2(offset, offset*10)); 
-            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/3 - 2*offset, 0)); 
+            ImGui::SetNextWindowPos(glm::vec2(x + padding, y + height + 10 + padding)); 
+            ImGui::SetNextWindowSize(glm::vec2(width, 0)); 
             if (ImGui::Begin("controls")){
                 if(ImGui::Button("stop"))
                 {
-                    ofLogNotice("stop pressed");
+                    stopPlayer();
                 }
                 ImGui::SameLine();
                 if(ImGui::Button("previous"))
@@ -324,7 +353,6 @@ void ofApp::exit()
 
     for (auto i = 0; i < _points.size(); i++)
     {
-
         try
         {
             // attention: wild cast here, assumption x < 256
@@ -474,11 +502,11 @@ bool ofApp::connectToArduino(std::string description)
     if (success)
     {
         _device.registerAllEvents(this);
-        ofLogNotice("ofApp::setup") << "Successfully setup " << devicesInfo[0];
+        ofLogNotice("") << "Successfully setup " << devicesInfo[0];
     }
     else
     {
-        ofLogNotice("ofApp::setup") << "Unable to setup " << devicesInfo[0];
+        ofLogNotice("") << "Unable to setup " << devicesInfo[0];
     }
 
     return success;
@@ -502,14 +530,7 @@ void ofApp::keyReleased(int key)
     case OF_KEY_RETURN:
     case ' ':
     {
-        if (_videoPlayer.isPlaying())
-        {
-            _videoPlayer.setPaused(true);
-        }
-        else
-        {
-            _videoPlayer.play();
-        }
+        togglePlayer();
         break;
     }
     case 'c':
@@ -562,8 +583,6 @@ void ofApp::keyReleased(int key)
 
 void ofApp::dragEvent(ofDragInfo info)
 {
-    // ofLogVerbose("DLR 2.0")<<info.files.back();
-
     std::vector<std::string> files;
 
     ofFile ofFiles(info.files.back());
@@ -668,6 +687,20 @@ void ofApp::mouseReleased(int x, int y, int button)
 {
 }
 
+void ofApp::stopPlayer(){
+    _videoPlayer.stop();
+    _selectedVideoIndex = -1;
+}
+void ofApp::togglePlayer(){
+    if (_videoPlayer.isPlaying())
+    {
+        _videoPlayer.setPaused(true);
+    }
+    else
+    {
+        _videoPlayer.play();
+    }
+}
 void ofApp::nextVideo(){
     loadVideoByIndex(_selectedVideoIndex + 1, _loop);
 }
@@ -685,9 +718,25 @@ void ofApp::onSerialError(const ofx::IO::SerialBufferErrorEventArgs &args)
     ofLogError() << "Serial error " << args.buffer().toString();
 }
 
-void ofApp::onMuteChange(bool & value){
-
+void ofApp::onModeChange(int & value){
+    switch(value){
+        case INPUTMODE::INPUTMODE_VIDEOGRABBER: {
+            // TODO: add device dropdown
+            // _videoGrabber.setDeviceID(0);
+            _videoGrabber.initGrabber(640, 480);
+            break;
+        }
+        default: {
+            _videoGrabber.close();
+            break;
+        }
+    }
 }
-void ofApp::onLoopChange(bool & value){
 
+void ofApp::onMuteChange(bool & value){
+    _videoPlayer.setVolume(value ? 0 : 1);
+}
+
+void ofApp::onLoopChange(bool & value){
+    _videoPlayer.setLoopState(value ? ofLoopType::OF_LOOP_NORMAL : ofLoopType::OF_LOOP_NONE);
 }
