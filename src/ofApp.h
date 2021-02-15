@@ -6,7 +6,7 @@
 #include "ofxImGui.h"
 #include "./Theme.h"
 
-#define USENDI
+// #define USENDI
 
 #ifdef USENDI
 #include "ofxNDIGrabber.h"
@@ -42,6 +42,9 @@ public:
     void mouseMoved(int x, int y);
     void mouseReleased(int x, int y, int button);
 
+    void nextVideo();
+    void previousVideo();
+
     ofJson _config;
 
 // private:
@@ -62,7 +65,8 @@ public:
     ofxIO::PacketSerialDevice _device;
 
     ofParameterGroup _parameters;
-    ofParameter<bool> _loopVideoParameter;
+    ofParameter<bool> _loop;
+    ofParameter<bool> _mute;
     ofParameter<bool> _drawMask;
 
     std::vector<std::string> _modeLabels;
@@ -86,4 +90,7 @@ public:
 
     void onSerialBuffer(const ofxIO::SerialBufferEventArgs &args);
     void onSerialError(const ofxIO::SerialBufferErrorEventArgs &args);
+
+    void onMuteChange(bool & value);
+    void onLoopChange(bool & value);
 };

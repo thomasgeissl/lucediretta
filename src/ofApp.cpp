@@ -9,6 +9,10 @@ ofApp::ofApp()
     _videoPlayer.setLoopState(ofLoopType::OF_LOOP_NONE);
     loadMask("mask.svg");
     _drawMask.set("draw mask", false);
+    _mute.addListener(this, &ofApp::onMuteChange);
+    _mute.set("mute", false);
+    _loop.addListener(this, &ofApp::onLoopChange);
+    _loop.set("loop", false);
 
     ofSetBackgroundColor(ofColor(32,32,32));
 
@@ -60,19 +64,19 @@ void ofApp::setup()
         addVideo(ofFilePath::join(ofFilePath::getEnclosingDirectory(dir.getAbsolutePath()), dir.getPath(i)));
     }
     _videoPlayer.setPaused(true);
-    _loopVideos = _config["loopVideos"];
-    if (!_loopVideos)
+    _loop = _config["loopVideos"];
+    if (!_loop)
     {
         _videoPlayer.setLoopState(OF_LOOP_NONE);
     }
 
-    _mode.set("mode", 0, 0, _modeLabels.size());
+    _mode.set("mode", INPUTMODE::INPUTMODE_VIDEOPLAYER, 0, _modeLabels.size());
     setupGui();
+    connectToArduino();
 }
 
 void ofApp::update()
 {
-    ofLogNotice() << "update";
     auto frameNumber = ofGetFrameNum();
     // if(frameNumber % 120 == 0){
     //     updateSerialDeviceList();
@@ -132,7 +136,6 @@ void ofApp::update()
 
 void ofApp::draw()
 {
-    ofLogNotice() << "draw";
     ofPushMatrix();
     ofTranslate(532, 112);
 
@@ -244,14 +247,65 @@ void ofApp::draw()
 
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
             // ImGui::SetNextWindowPos(glm::vec2(offset, offset*10)); 
-            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/4 - 2*offset, 0)); 
+            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/3 - 2*offset, 0)); 
             if (ImGui::Begin("library")){
-                if(ofxImGui::VectorListBox("", &_selectedVideoIndex, _videoFiles)){
-                    // ofLogNotice("TODO") << "trigger video " << _selectedVideoIndex;
+                std::vector<std::string> videoLabels;
+                for(auto & file : _videoFiles){
+                    videoLabels.push_back(ofFilePath::getBaseName(file));
+                }
+                if(ofxImGui::VectorListBox("", &_selectedVideoIndex, videoLabels)){
+                    ofLogNotice("TODO") << "trigger video " << _selectedVideoIndex;
+                    loadVideoByIndex(_selectedVideoIndex, false);
                 }
             }
             ImGui::End();
         }
+
+        if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
+            // ImGui::SetNextWindowPos(glm::vec2(offset, offset*10)); 
+            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/3 - 2*offset, 0)); 
+            if (ImGui::Begin("controls")){
+                if(ImGui::Button("stop"))
+                {
+                    ofLogNotice("stop pressed");
+                }
+                ImGui::SameLine();
+                if(ImGui::Button("previous"))
+                {
+                    previousVideo();
+                }
+                ImGui::SameLine();
+                if(!_videoPlayer.isPlaying()){
+                    if(ImGui::Button("play"))
+                    {
+                        ofLogNotice("play pressed");
+                    }
+                    ImGui::SameLine();
+                }else{
+                    if(ImGui::Button("pause"))
+                    {
+                        ofLogNotice("play pressed");
+                    }
+                    ImGui::SameLine();
+                }
+                if(ImGui::Button("next"))
+                {
+                    nextVideo();
+                }
+                ImGui::SameLine();
+                bool loopValue = _loop.get();
+                if(ImGui::Checkbox("loop", &loopValue)){
+                    _loop = loopValue;
+                }
+                ImGui::SameLine();
+                bool muteValue = _mute.get();
+                if(ImGui::Checkbox("mute", &muteValue)){
+                    _mute = muteValue;
+                }
+            }
+            ImGui::End();
+        }
+
     gui.end();
 }
 
@@ -327,7 +381,7 @@ void ofApp::loadVideo(std::string path, bool loop)
         ofLogError() << "could not load video. file format not supported (yet)";
         return;
     }
-    // _videoPlayer.load(path);
+    _videoPlayer.load(path);
     _videoPlayer.play();
     if (!loop)
     {
@@ -348,8 +402,10 @@ void ofApp::loadVideoByIndex(int index, bool loop)
         index = 0;
     }
 
-    loadVideo(_videoFiles[index], loop);
-    _selectedVideoIndex = index;
+    if(index >= 0 && index < _videoFiles.size()){
+        loadVideo(_videoFiles[index], loop);
+        _selectedVideoIndex = index;
+    }
 }
 void ofApp::loadVideoByPath(std::string path, bool loop)
 {
@@ -475,20 +531,20 @@ void ofApp::keyReleased(int key)
         ofFileDialogResult openFileResult = ofSystemLoadDialog("select video");
         if (openFileResult.bSuccess)
         {
-            loadVideo(openFileResult.getPath(), _loopVideos);
+            loadVideo(openFileResult.getPath(), _loop);
         }
         break;
     }
     case OF_KEY_UP:
     case OF_KEY_LEFT:
     {
-        loadVideoByIndex(_selectedVideoIndex - 1, _loopVideos);
+        previousVideo();
         break;
     }
     case OF_KEY_DOWN:
     case OF_KEY_RIGHT:
     {
-        loadVideoByIndex(_selectedVideoIndex + 1, _loopVideos);
+        nextVideo();
         break;
     }
     }
@@ -499,7 +555,7 @@ void ofApp::keyReleased(int key)
     {
         if (keyNumber <= _videoFiles.size())
         {
-            loadVideoByIndex(keyNumber - 1, _loopVideos);
+            loadVideoByIndex(keyNumber - 1, _loop);
         }
     }
 }
@@ -562,13 +618,18 @@ void ofApp::updateSerialDeviceList()
 
 void ofApp::setupGui()
 {
-    ImGui::CreateContext();  
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/Roboto-Light.ttf")[0], 16.f);
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
-    // ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/fa-regular-400.ttf")[0], 16.0f, &icons_config, icons_ranges );
     gui.setup();
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    ImGui::CreateContext();  
+    auto io = ImGui::GetIO();
+    // auto font = io.Fonts->AddFontDefault();
+    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+    ImFontConfig icons_config;
+    icons_config.MergeMode = true; 
+    icons_config.PixelSnapH = true;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/Roboto-Light.ttf")[0], 16.f);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/fa-regular-400.ttf")[0], 16.0f, &icons_config, icons_ranges );
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    // io.Fonts->Build();
     ImGui::GetIO().MouseDrawCursor = false;
 
     gui.setTheme(new Theme());
@@ -577,7 +638,6 @@ void ofApp::setupGui()
 
 void ofApp::sendSerial()
 {
-    ofLogNotice() << "send serial";
     for (auto x = 0; x < _newLedPixels.size(); x++)
     {
         auto oldColor = _oldLedPixels[x];
@@ -608,6 +668,13 @@ void ofApp::mouseReleased(int x, int y, int button)
 {
 }
 
+void ofApp::nextVideo(){
+    loadVideoByIndex(_selectedVideoIndex + 1, _loop);
+}
+void ofApp::previousVideo(){
+    loadVideoByIndex(_selectedVideoIndex - 1, _loop);
+}
+
 void ofApp::onSerialBuffer(const ofx::IO::SerialBufferEventArgs &args)
 {
     ofLogNotice() << "Serial message " << args.buffer().toString();
@@ -616,4 +683,11 @@ void ofApp::onSerialBuffer(const ofx::IO::SerialBufferEventArgs &args)
 void ofApp::onSerialError(const ofx::IO::SerialBufferErrorEventArgs &args)
 {
     ofLogError() << "Serial error " << args.buffer().toString();
+}
+
+void ofApp::onMuteChange(bool & value){
+
+}
+void ofApp::onLoopChange(bool & value){
+
 }
