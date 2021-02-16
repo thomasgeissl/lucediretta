@@ -6,7 +6,7 @@
 #include "ofxImGui.h"
 #include "./Theme.h"
 
-// #define USENDI
+#define USENDI
 
 #ifdef USENDI
 #include "ofxNDIGrabber.h"
@@ -23,6 +23,7 @@ class ofApp : public ofBaseApp
 public:
     ofApp();
     ~ofApp();
+    
     void setup();
     void update();
     void draw();
@@ -53,11 +54,12 @@ public:
 // private:
 #ifdef USENDI
     ofxNDIGrabber _ndiGrabber;
+    std::vector<ofVideoDevice> _ndiGrabberDevices;
 #endif
     ofVideoPlayer _videoPlayer;
     ofVideoGrabber _videoGrabber;
-    std::vector<ofVideoDevice> _ndiDevices;
-    int _selectedNdiDevice;
+    std::vector<ofVideoDevice> _videoGrabberDevices;
+    ofParameter<int> _selectedNdiDevice;
 
 
     std::vector<ofPoint> _points;
@@ -83,6 +85,8 @@ public:
 
     void setupGui();
     void updateSerialDeviceList();
+    void updateNDIGrabberList();
+    void updateVideoGrabberList();
 
     void loadVideoByIndex(int index, bool loop);
     void loadVideoByPath(std::string path, bool loop);
@@ -96,4 +100,6 @@ public:
     void onModeChange(int & mode);
     void onMuteChange(bool & value);
     void onLoopChange(bool & value);
+    
+    void onNDIDeviceChange(int & value);
 };

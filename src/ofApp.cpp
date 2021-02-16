@@ -15,11 +15,14 @@ ofApp::ofApp()
     _mute.set("mute", false);
     _loop.addListener(this, &ofApp::onLoopChange);
     _loop.set("loop", false);
+    
+    _selectedNdiDevice.addListener(this, &ofApp::onNDIDeviceChange);
+    _selectedNdiDevice.set("ndiDevice", 0);
 
     ofSetBackgroundColor(ofColor(32,32,32));
 
 #ifdef USENDI
-    _ndiDevices = _ndiGrabber.listDevices();
+    _ndiGrabberDevices = _ndiGrabber.listDevices();
     for (auto & device : _ndiGrabber.listDevices())
     {
         ofLogNotice("led animation toolkit") << device.id << " " << device.deviceName;
@@ -74,14 +77,17 @@ void ofApp::setup()
 
     setupGui();
     connectToArduino();
+    
+    ofLogNotice() << "available video grabbers";
+    _videoGrabber.listDevices();
 }
 
 void ofApp::update()
 {
     auto frameNumber = ofGetFrameNum();
-    // if(frameNumber % 120 == 0){
-    //     updateSerialDeviceList();
-    // } 
+    if(frameNumber % 120 == 0){
+        updateSerialDeviceList();
+    }
     // _client.update();
     std::string message;
     bool isNewFrame = false;
@@ -130,21 +136,21 @@ void ofApp::update()
     }
     else if (_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER)
     {
-        _videoGrabber.update();
-        if (_videoGrabber.isFrameNew())
-        {
-            isNewFrame = true;
-            for (auto i = 0; i < _points.size(); i++)
-            {
-                auto point = _points[i];
-                auto color = _videoGrabber.getPixels().getColor(_videoGrabber.getWidth() * point.x, _videoGrabber.getHeight() * point.y);
-                int r = color.r;
-                int g = color.g;
-                int b = color.b;
+         _videoGrabber.update();
+         if (_videoGrabber.isFrameNew())
+         {
+             isNewFrame = true;
+             for (auto i = 0; i < _points.size(); i++)
+             {
+                 auto point = _points[i];
+                 auto color = _videoGrabber.getPixels().getColor(_videoGrabber.getWidth() * point.x, _videoGrabber.getHeight() * point.y);
+                 int r = color.r;
+                 int g = color.g;
+                 int b = color.b;
 
-                _newLedPixels[i] = color;
-            }
-        }
+                 _newLedPixels[i] = color;
+             }
+         }
     }
 
     if (isNewFrame)
@@ -155,93 +161,38 @@ void ofApp::update()
 
 void ofApp::draw()
 {
-    ofPushMatrix();
-    auto x = ofGetWidth()/2;
-    auto y = 112;
     auto padding = ofGetWidth()*0.01;
-    ofTranslate(x+padding, y);
 
-    auto width = ofGetWidth()/2 - 2*padding;
-    auto height = 0;
+    gui.begin();
+    auto settings = ofxImGui::Settings();
+    auto settingsWindowPosition = glm::vec2(padding, padding);
+    auto settingsWindowSize = glm::vec2(0, 0);
 
-    int vX = 0;
-    int vY = 0;
+    ImGui::SetNextWindowPos(settingsWindowPosition); 
+    ImGui::SetNextWindowSize(glm::vec2(ofGetWidth() - 2*padding, 0)); 
 
-    if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER)
-    {
-#ifdef USENDI
-        height = (_ndiGrabber.getHeight() / _ndiGrabber.getWidth()) * width;
-        _ndiGrabber.draw(0, 0, width, height);
-#endif
-    }
-    else if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER)
-    {
-        height = (_videoPlayer.getHeight() / _videoPlayer.getWidth()) * width;
-        _videoPlayer.draw(0, 0, width, height);
-        ofDrawRectangle(0, height+5, _videoPlayer.getPosition()*width, 10);
-    }
-    // cout << height << "\n" ;
-    ofPopMatrix();
+        if (ImGui::Begin("settings")){
 
-    // SVG Mask
-
-    // if (_drawMask)
-    {
-        ofPushStyle();
-        ofPushMatrix();
-        ofTranslate(x, y);
-
-        for (auto i = 0; i < _points.size(); i++)
-        {
-            auto point = _points[i];
-            ofSetColor(0, 255, 0);
-            ofDrawRectangle(point.x * width, point.y * height, 2, 2);
-            //            ofSetColor(255, 255, 255);
-            //            ofDrawBitmapString(ofToString(i), point.x*width, point.y*height);
-        }
-        ofPopMatrix();
-        ofPopStyle();
-    }
-    //    ofLogNotice("default Loop: ") << _config["defaultLoop"].is_null();
-    // Play default video when there is no other video playing
-    if (_videoPlayer.getIsMovieDone() && _config["defaultLoop"].is_null() == false && _config["defaultLoop"]["path"].is_null() == false)
-    {
-        loadVideoByPath(_config["defaultLoop"]["path"], true);
-    }
-
-    //    ofLogNotice("movie is done: ") << (_videoPlayer.getIsMovieDone() ? "true" : "false");
-    //    ofLogNotice("movie is playing: ") << (_videoPlayer.isPlaying() ? "true" : "false");
-
-
-        gui.begin();
-        auto settings = ofxImGui::Settings();
-        auto offset = padding;
-        auto winPosition = glm::vec2(offset, offset);
-        auto winSize = glm::vec2(0, 0);
-
-        ImGui::SetNextWindowPos(winPosition); 
-        ImGui::SetNextWindowSize(glm::vec2(ofGetWidth() - 2*offset, 0)); 
-        if (ImGui::Begin("I/O")){
             if (ImGui::BeginCombo("mode", _modeLabels[_mode].c_str()))
             {
                 for (auto i = 0; i < _modeLabels.size(); i++)
                 {
-                    bool is_selected = (_mode == i); // You can store your selection however you want, outside or inside your objects
+                    bool is_selected = (_mode == i);
                     if (ImGui::Selectable(_modeLabels[i].c_str(), is_selected))
                         _mode = i;
                     if (is_selected)
-                        ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                        ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
             }
             // ImGui::SameLine();
-            if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER && !_ndiDevices.empty()){
-                if (ImGui::BeginCombo("ndi device", _ndiDevices[_selectedNdiDevice].deviceName.c_str()))
+            if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER && !_ndiGrabberDevices.empty()){
+                if (ImGui::BeginCombo("ndi device", _ndiGrabberDevices[_selectedNdiDevice].deviceName.c_str()))
                 {
-                    for (auto i = 0; i < _ndiDevices.size(); i++)
+                    for (auto i = 0; i < _ndiGrabberDevices.size(); i++)
                     {
                         bool is_selected = (_selectedNdiDevice == i); // You can store your selection however you want, outside or inside your objects
-                        if (ImGui::Selectable(_ndiDevices[i].deviceName.c_str()), is_selected)
+                        if (ImGui::Selectable(_ndiGrabberDevices[i].deviceName.c_str()), is_selected)
                             _selectedNdiDevice = i;
                         if (is_selected)
                             ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
@@ -251,30 +202,91 @@ void ofApp::draw()
             }
             // ImGui::SameLine();
 
-            if (!_serialDevices.empty() && ImGui::BeginCombo("serial", _serialDevices[_selectedSerialDevice].getPort().c_str()))
+            if (!_serialDevices.empty() && ImGui::BeginCombo("serial", _serialDevices[_selectedSerialDevice].port().c_str()))
             {
                 for (auto i = 0; i < _serialDevices.size(); i++)
                 {
                     bool is_selected = (_selectedSerialDevice == i); // You can store your selection however you want, outside or inside your objects
-                    if (ImGui::Selectable(_serialDevices[i].getPort().c_str(), is_selected))
+                    if (ImGui::Selectable(_serialDevices[i].port().c_str(), is_selected))
                         _selectedSerialDevice = i;
                     if (is_selected)
                         ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
                 }
                 ImGui::EndCombo();
             }
-
-            // ImGui::SameLine();
-            // ofxImGui::AddParameter(_drawMask);
-            winSize = ImGui::GetWindowSize();
+            
+            if(ImGui::Button("load mask"))
+            {
+                ofFileDialogResult result = ofSystemLoadDialog("load svg mask");
+                if(result.bSuccess) {
+                  std::string path = result.getPath();
+                    auto basename = ofFilePath::getBaseName(path);
+                    auto extension = ofFilePath::getFileExt(path);
+                    if(extension == ".svg"){
+                        loadMask(path);
+                    }
+                }
+            }
+            ImGui::SameLine();
+            bool drawMaskValue = _drawMask.get();
+            if(ImGui::Checkbox("draw mask", &drawMaskValue)){
+                _drawMask = drawMaskValue;
+            }
+            
+            settingsWindowSize = ImGui::GetWindowSize();
             ImGui::End();
         }
 
+ ofPushMatrix();
 
+    auto previewPosition = glm::vec2(padding, settingsWindowPosition.y + settingsWindowSize.y + padding);
+    auto previewSize = glm::vec2(ofGetWidth()/2 - 2*padding, 0);
+    ofTranslate(previewPosition.x, previewPosition.y);
 
+    if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER)
+    {
+#ifdef USENDI
+        previewSize.y = (_ndiGrabber.getHeight() / _ndiGrabber.getWidth()) * previewSize.x;
+        _ndiGrabber.draw(0, 0, previewSize.x, previewSize.y);
+#endif
+    }
+    else if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER)
+    {
+        previewSize.y = (_videoPlayer.getHeight() / _videoPlayer.getWidth()) * previewSize.x;
+        _videoPlayer.draw(0, 0, previewSize.x, previewSize.y);
+        ofDrawRectangle(0, previewSize.y+padding, _videoPlayer.getPosition()*previewSize.x, 10);
+    }
+    else if(_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER)
+    {
+        previewSize.y = (_videoGrabber.getHeight() / _videoGrabber.getWidth()) * previewSize.x;
+        _videoGrabber.draw(0, 0, previewSize.x, previewSize.y);
+    }
+    ofPopMatrix();
+
+    // SVG Mask
+
+    if (_drawMask)
+    {
+        ofPushStyle();
+        ofPushMatrix();
+        ofTranslate(padding, settingsWindowSize.y + padding);
+
+        for (auto i = 0; i < _points.size(); i++)
+        {
+            auto point = _points[i];
+            ofSetColor(0, 255, 0);
+            ofDrawRectangle(point.x * previewSize.x, point.y * previewSize.y, 2, 2);
+            //            ofSetColor(255, 255, 255);
+            //            ofDrawBitmapString(ofToString(i), point.x*width, point.y*height);
+        }
+        ofPopMatrix();
+        ofPopStyle();
+    }
+
+// ##### draw library
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            ImGui::SetNextWindowPos(glm::vec2(offset, winPosition.y + winSize.y + offset)); 
-            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/2 - 2*offset, 0)); 
+            ImGui::SetNextWindowPos(glm::vec2(ofGetWidth()/2 + padding, settingsWindowPosition.y + settingsWindowSize.y + padding)); 
+            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/2 - 2*padding, 0)); 
             if (ImGui::Begin("library")){
                 std::vector<std::string> videoLabels;
                 for(auto & file : _videoFiles){
@@ -282,17 +294,30 @@ void ofApp::draw()
                 }
                 ImGui::PushItemWidth(ImGui::GetWindowContentRegionWidth());
                 if(ofxImGui::VectorListBox("", &_selectedVideoIndex, videoLabels)){
-                    ofLogNotice("TODO") << "trigger video " << _selectedVideoIndex;
                     loadVideoByIndex(_selectedVideoIndex, false);
                 }
                 ImGui::PopItemWidth();
+                
+                if(ImGui::Button("add"))
+                {
+                    ofFileDialogResult result = ofSystemLoadDialog("add video");
+                    if(result.bSuccess) {
+                      std::string path = result.getPath();
+                        auto basename = ofFilePath::getBaseName(path);
+                        auto extension = ofFilePath::getFileExt(path);
+                        if(extension == "mp4" || extension == "mov"){
+                            addVideo(path);
+                        }
+                    }
+                }
             }
             ImGui::End();
         }
 
+// ##### draw player controls
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            ImGui::SetNextWindowPos(glm::vec2(x + padding, y + height + 10 + padding)); 
-            ImGui::SetNextWindowSize(glm::vec2(width, 0)); 
+            ImGui::SetNextWindowPos(glm::vec2(previewPosition.x,  previewPosition.y + previewSize.y + 10 + padding)); 
+            ImGui::SetNextWindowSize(glm::vec2(previewSize.x, 0)); 
             if (ImGui::Begin("controls")){
                 if(ImGui::Button("stop"))
                 {
@@ -307,13 +332,14 @@ void ofApp::draw()
                 if(!_videoPlayer.isPlaying()){
                     if(ImGui::Button("play"))
                     {
-                        ofLogNotice("play pressed");
+                        _videoPlayer.setPaused(false);
+                        _videoPlayer.play();
                     }
                     ImGui::SameLine();
                 }else{
                     if(ImGui::Button("pause"))
                     {
-                        ofLogNotice("play pressed");
+                        _videoPlayer.setPaused(true);
                     }
                     ImGui::SameLine();
                 }
@@ -335,6 +361,7 @@ void ofApp::draw()
             ImGui::End();
         }
 
+//    ImGui::ShowStyleEditor();
     gui.end();
 }
 
@@ -371,7 +398,7 @@ void ofApp::loadMask(std::string path)
     ofFile file(path);
     if (ofToLower(file.getExtension()) != "svg")
     {
-        ofLogError("led animation toolkit") << "could not load mask. file format not supported (yet)";
+        ofLogError() << "could not load mask. file format not supported (yet)";
         return;
     }
     std::vector<ofPoint> points;
@@ -462,7 +489,7 @@ bool ofApp::connectToArduino()
     {
         if ((ofToLower(device.getDescription()).find("arduino") != std::string::npos) || (ofToLower(device.getDescription()).find("usb serial device") != std::string::npos) || (ofToLower(device.getDescription()).find("teensyduino") != std::string::npos))
         {
-            _device.setup(device.getPort(), 115200);
+            _device.setup(device.port(), 115200);
         }
     }
     auto success = _device.isOpen();
@@ -482,7 +509,7 @@ bool ofApp::connectToArduino(std::string description)
     std::vector<ofx::IO::SerialDeviceInfo> devicesInfo = ofx::IO::SerialDeviceUtils::listDevices();
     for (auto device : devicesInfo)
     {
-        if (ofToLower(device.getDescription()) == ofToLower(description))
+        if (ofToLower(device.description()) == ofToLower(description))
         {
             auto success = _device.setup(devicesInfo[0], 115200);
 
@@ -635,20 +662,42 @@ void ofApp::updateSerialDeviceList()
     _serialDevices = ofx::IO::SerialDeviceUtils::listDevices();
 }
 
+void ofApp::updateNDIGrabberList()
+{
+    _ndiGrabberDevices = _ndiGrabber.listDevices();
+}
+
+void ofApp::updateVideoGrabberList()
+{
+    _videoGrabberDevices = _videoGrabber.listDevices();
+}
+
 void ofApp::setupGui()
 {
     gui.setup();
-    ImGui::CreateContext();  
+    ImGui::CreateContext();
     auto io = ImGui::GetIO();
-    // auto font = io.Fonts->AddFontDefault();
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config;
-    icons_config.MergeMode = true; 
-    icons_config.PixelSnapH = true;
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/Roboto-Light.ttf")[0], 16.f);
-    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/fa-regular-400.ttf")[0], 16.0f, &icons_config, icons_ranges );
+    auto font = io.Fonts->AddFontDefault();
+
+    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 }; // Will not be copied by AddFont* so keep in scope.
+    ImFontConfig config;
+//    config.MergeMode = true;
+//    config.GlyphMinAdvanceX = 16.0f; // Use if you want to make the icon monospaced
+
+//    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/Roboto-Light.ttf")[0], 16.f, &config, io.Fonts->GetGlyphRangesDefault());
+//    ImGui::GetIO().Fonts->AddFontFromFileTTF(&ofToDataPath("fonts/fa-regular-400.ttf")[0], 16.0f, &config, icons_ranges );
+
     // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    // io.Fonts->Build();
+    // Build atlas
+//    io.Fonts->Build();
+
+    // Retrieve texture in RGBA format
+//    unsigned char* tex_pixels = NULL;
+//    int tex_width, tex_height;
+//    io.Fonts->GetTexDataAsRGBA32(&tex_pixels, &tex_width, &tex_height);
+
+    
+    
     ImGui::GetIO().MouseDrawCursor = false;
 
     gui.setTheme(new Theme());
@@ -726,6 +775,12 @@ void ofApp::onModeChange(int & value){
             _videoGrabber.initGrabber(640, 480);
             break;
         }
+        case INPUTMODE::INPUTMODE_NDIGRABBER: {
+            _videoGrabber.close();
+            stopPlayer();
+            _ndiGrabber.setDevice(_ndiGrabberDevices[_selectedNdiDevice]);
+
+        }
         default: {
             _videoGrabber.close();
             break;
@@ -739,4 +794,10 @@ void ofApp::onMuteChange(bool & value){
 
 void ofApp::onLoopChange(bool & value){
     _videoPlayer.setLoopState(value ? ofLoopType::OF_LOOP_NORMAL : ofLoopType::OF_LOOP_NONE);
+}
+
+void ofApp::onNDIDeviceChange(int & value){
+    if(value >= 0 && value < _ndiGrabberDevices.size()){
+        _ndiGrabber.setDevice(_ndiGrabberDevices[value]);
+    }
 }
