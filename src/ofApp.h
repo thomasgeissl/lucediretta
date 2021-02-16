@@ -75,6 +75,10 @@ public:
     std::vector<ofPoint> _points;
     std::vector<ofColor> _oldLedPixels;
     std::vector<ofColor> _newLedPixels;
+    
+    ofParameter<bool> _recording;
+    ofJson _recordedAnimation;
+    uint64_t _recordingStartedTimestamp;
 
     ofxIO::PacketSerialDevice _device;
 
@@ -110,6 +114,7 @@ public:
     void onModeChange(int & mode);
     void onMuteChange(bool & value);
     void onLoopChange(bool & value);
+    void onRecordingChange(bool & value);
     
     void onNDIDeviceChange(int & value);
 };

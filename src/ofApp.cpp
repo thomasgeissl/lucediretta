@@ -37,6 +37,9 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     _loop.addListener(this, &ofApp::onLoopChange);
     _loop.set("loop", false);
     
+    _recording.addListener(this, &ofApp::onRecordingChange);
+    _recording.set("recording", false);
+    
     _selectedNdiDevice.addListener(this, &ofApp::onNDIDeviceChange);
     _selectedNdiDevice.set("ndiDevice", 0);
 
@@ -628,6 +631,11 @@ void ofApp::keyReleased(int key)
         }
         break;
     }
+    case 'r':
+    {
+        _recording = !_recording;
+        break;
+    }
     case 'v':
     {
         ofFileDialogResult openFileResult = ofSystemLoadDialog("select video");
@@ -760,6 +768,11 @@ void ofApp::setupGui()
 
 void ofApp::sendSerial()
 {
+    auto object = ofJson::object();
+    if(_recording){
+        object["time"] = ofGetElapsedTimeMillis() - _recordingStartedTimestamp;
+        object["pixels"] = ofJson::array();
+    }
     for (auto x = 0; x < _newLedPixels.size(); x++)
     {
         auto oldColor = _oldLedPixels[x];
@@ -773,6 +786,14 @@ void ofApp::sendSerial()
                 std::vector<uint8_t> data = {(unsigned char)(x), newColor.r, newColor.g, newColor.b};
                 ofx::IO::ByteBuffer buffer(data);
                 _device.send(buffer);
+                if(_recording){
+                    auto pixel = ofJson::object();
+                    pixel["index"] = x;
+                    pixel["r"] = newColor.r;
+                    pixel["g"] = newColor.r;
+                    pixel["b"] = newColor.r;
+                    object["pixels"].push_back(pixel);
+                }
             }
             catch (...)
             {
@@ -780,6 +801,10 @@ void ofApp::sendSerial()
         }
     }
     _oldLedPixels = _newLedPixels;
+    
+    if(_recording){
+        _recordedAnimation.push_back(object);
+    }
 }
 
 void ofApp::mouseMoved(int x, int y)
@@ -848,6 +873,16 @@ void ofApp::onMuteChange(bool & value){
 
 void ofApp::onLoopChange(bool & value){
     _videoPlayer.setLoopState(value ? ofLoopType::OF_LOOP_NORMAL : ofLoopType::OF_LOOP_NONE);
+}
+
+void ofApp::onRecordingChange(bool & value){
+    if(value){
+        _recordingStartedTimestamp = ofGetElapsedTimeMillis();
+        _recordedAnimation.clear();
+        _recordedAnimation = ofJson::array();
+    }else{
+        ofLogNotice() << _recordedAnimation.dump(4);
+    }
 }
 
 void ofApp::onNDIDeviceChange(int & value){
