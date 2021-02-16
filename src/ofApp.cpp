@@ -1,16 +1,34 @@
 #include "ofApp.h"
 #include "../libs/IconFontCppHeaders/IconsFontAwesome5.h"
 
-ofApp::ofApp() 
+ofApp::ofApp(INPUTMODE mode, std::string mask)
 {
     ofSetWindowTitle("luce diretta");
     ofSetFrameRate(60);
+    
+#ifdef USENDI
+    _ndiGrabberDevices = _ndiGrabber.listDevices();
+    for (auto & device : _ndiGrabber.listDevices())
+    {
+        ofLogNotice("led animation toolkit") << device.id << " " << device.deviceName;
+        connectToNDISender(device.deviceName);
+    }
+#endif
 
-    loadMask("mask.svg");
+    if(!mask.empty()){
+        if(ofFilePath::isAbsolute(mask)){
+            loadMask(mask);
+        }else{
+            ofLogError() << mask <<" is not an absolute path, TODO: support relative file paths";
+        }
+        
+    }else{
+        loadMask("mask.svg");
+    }
     _drawMask.set("draw mask", false);
 
     _mode.addListener(this, &ofApp::onModeChange);
-    _mode.set("mode", INPUTMODE::INPUTMODE_VIDEOPLAYER, 0, _modeLabels.size());
+    _mode.set("mode", mode, 0, _modeLabels.size());
     _mute.addListener(this, &ofApp::onMuteChange);
     _mute.set("mute", false);
     _loop.addListener(this, &ofApp::onLoopChange);
@@ -21,14 +39,7 @@ ofApp::ofApp()
 
     ofSetBackgroundColor(ofColor(32,32,32));
 
-#ifdef USENDI
-    _ndiGrabberDevices = _ndiGrabber.listDevices();
-    for (auto & device : _ndiGrabber.listDevices())
-    {
-        ofLogNotice("led animation toolkit") << device.id << " " << device.deviceName;
-        connectToNDISender(device.deviceName);
-    }
-#endif
+
 
     _selectedVideoIndex = -1;
 

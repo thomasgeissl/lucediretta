@@ -21,7 +21,7 @@ enum INPUTMODE {
 class ofApp : public ofBaseApp
 {
 public:
-    ofApp();
+    ofApp(INPUTMODE mode, std::string mask);
     ~ofApp();
     
     void setup();
