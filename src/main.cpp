@@ -17,6 +17,8 @@ int main(int argc, char *argv[]){
         mode = INPUTMODE::INPUTMODE_VIDEOPLAYER;
     }else if(modeString == "VIDEOGRABBER"){
         mode = INPUTMODE::INPUTMODE_VIDEOGRABBER;
+    }else if(modeString == "SYPHON"){
+        mode = INPUTMODE::INPUTMODE_SYPHON;
     }
     
     

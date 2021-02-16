@@ -1,10 +1,13 @@
 # luce diretta - direct light
 This is a work in progress and mostly broken.
 
+luce diretta will be your friend if you need to design led animations and wanna preview them directly on led strips instead of screens.
+It can work with ndi streams, rendered video files, web cam input and syphon. 
+
 ## Usage
 ### Command line arguments
 luce diretta accepts command line arguments. If you start the app from the terminal, you can set the following options:
-* -m, --mode : [NDIGRABBER, VIDEOPLAYER, VIDEOGRABBER]
+* -m, --mode : [NDIGRABBER, VIDEOPLAYER, VIDEOGRABBER, SYPHON]
 * -M, --mask : absolute path to the svg mask
 
 ### Masks

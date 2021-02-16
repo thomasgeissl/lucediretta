@@ -7,15 +7,21 @@
 #include "./Theme.h"
 
 #define USENDI
+#define USESYPHON
 
 #ifdef USENDI
 #include "ofxNDIGrabber.h"
+#endif
+
+#ifdef USESYPHON
+#include "ofxSyphon.h"
 #endif
 
 enum INPUTMODE {
     INPUTMODE_NDIGRABBER = 0,
     INPUTMODE_VIDEOPLAYER,
     INPUTMODE_VIDEOGRABBER,
+    INPUTMODE_SYPHON
 };
 
 class ofApp : public ofBaseApp
@@ -55,6 +61,10 @@ public:
 #ifdef USENDI
     ofxNDIGrabber _ndiGrabber;
     std::vector<ofVideoDevice> _ndiGrabberDevices;
+#endif
+#ifdef USESYPHON
+    ofxSyphonClient _syphonClient;
+    ofFbo _syphonFbo;
 #endif
     ofVideoPlayer _videoPlayer;
     ofVideoGrabber _videoGrabber;

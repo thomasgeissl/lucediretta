@@ -14,6 +14,9 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
         connectToNDISender(device.deviceName);
     }
 #endif
+#ifdef USESYPHON
+    _syphonClient.setup();
+#endif
 
     if(!mask.empty()){
         if(ofFilePath::isAbsolute(mask)){
@@ -54,6 +57,7 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     _modeLabels.push_back("NDI grabber");
     _modeLabels.push_back("video player");
     _modeLabels.push_back("video grabber");
+    _modeLabels.push_back("syphon");
 
 
     updateSerialDeviceList();
@@ -163,6 +167,39 @@ void ofApp::update()
              }
          }
     }
+    else if (_mode == INPUTMODE::INPUTMODE_SYPHON)
+    {
+#ifdef USESYPHON
+        if(!_syphonFbo.isAllocated()
+           || _syphonClient.getWidth() != _syphonFbo.getWidth()
+           || _syphonClient.getHeight() != _syphonFbo.getHeight()
+           ){
+            _syphonFbo.allocate(_syphonClient.getWidth(), _syphonClient.getHeight());
+        }
+
+        if(_syphonFbo.getWidth() == 0) return;
+        _syphonFbo.begin();
+        _syphonClient.draw(0,0);
+        _syphonFbo.end();
+        
+        ofPixels pix;
+        _syphonFbo.readToPixels(pix);
+        isNewFrame = true;
+
+        for (auto i = 0; i < _points.size(); i++)
+        {
+            auto point = _points[i];
+            auto color = pix.getColor(_syphonClient.getWidth() * point.x, _syphonClient.getHeight() * point.y);
+            int r = color.r;
+            int g = color.g;
+            int b = color.b;
+
+            _newLedPixels[i] = color;
+        }
+#endif
+    }
+
+
 
     if (isNewFrame)
     {
@@ -253,7 +290,6 @@ void ofApp::draw()
     auto previewPosition = glm::vec2(padding, settingsWindowPosition.y + settingsWindowSize.y + padding);
     auto previewSize = glm::vec2(ofGetWidth()/2 - 2*padding, 0);
     ofTranslate(previewPosition.x, previewPosition.y);
-
     if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER)
     {
 #ifdef USENDI
@@ -271,6 +307,13 @@ void ofApp::draw()
     {
         previewSize.y = (_videoGrabber.getHeight() / _videoGrabber.getWidth()) * previewSize.x;
         _videoGrabber.draw(0, 0, previewSize.x, previewSize.y);
+    }
+    if(_mode == INPUTMODE::INPUTMODE_SYPHON)
+    {
+#ifdef USESYPHON
+        previewSize.y = (_syphonClient.getHeight() / _syphonClient.getWidth()) * previewSize.x;
+        _syphonClient.draw(0, 0, previewSize.x, previewSize.y);
+#endif
     }
     ofPopMatrix();
 
