@@ -54,10 +54,10 @@ public:
     void togglePlayer();
     void nextVideo();
     void previousVideo();
+    void saveCurrentRecording();
+    void saveCurrentRecording(std::string path);
+    void exportVideo(std::string path);
 
-    ofJson _config;
-
-// private:
 #ifdef USENDI
     ofxNDIGrabber _ndiGrabber;
     std::vector<ofVideoDevice> _ndiGrabberDevices;
@@ -67,9 +67,11 @@ public:
     ofFbo _syphonFbo;
 #endif
     ofVideoPlayer _videoPlayer;
+    ofVideoPlayer _exportVideoPlayer;
     ofVideoGrabber _videoGrabber;
     std::vector<ofVideoDevice> _videoGrabberDevices;
     ofParameter<int> _selectedNdiDevice;
+    ofParameter<int> _selectedVideoGrabberDevice;
 
 
     std::vector<ofPoint> _points;
@@ -108,6 +110,8 @@ public:
     void clearVideos();
     void sendSerial();
 
+    
+    // listeners
     void onSerialBuffer(const ofxIO::SerialBufferEventArgs &args);
     void onSerialError(const ofxIO::SerialBufferErrorEventArgs &args);
 
@@ -117,4 +121,6 @@ public:
     void onRecordingChange(bool & value);
     
     void onNDIDeviceChange(int & value);
+    void onVideoGrabberDeviceChange(int & value);
+
 };

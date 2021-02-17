@@ -5,12 +5,14 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
 {
     ofSetWindowTitle("luce diretta");
     ofSetFrameRate(60);
+    ofSetBackgroundColor(ofColor(32,32,32));
+
     
 #ifdef USENDI
     _ndiGrabberDevices = _ndiGrabber.listDevices();
     for (auto & device : _ndiGrabber.listDevices())
     {
-        ofLogNotice("led animation toolkit") << device.id << " " << device.deviceName;
+        ofLogNotice() << device.id << " " << device.deviceName;
         connectToNDISender(device.deviceName);
     }
 #endif
@@ -28,7 +30,7 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     }else{
         loadMask("mask.svg");
     }
-    _drawMask.set("draw mask", false);
+    _drawMask.set("draw mask", true);
 
     _mode.addListener(this, &ofApp::onModeChange);
     _mode.set("mode", mode, 0, _modeLabels.size());
@@ -36,26 +38,17 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     _mute.set("mute", false);
     _loop.addListener(this, &ofApp::onLoopChange);
     _loop.set("loop", false);
-    
     _recording.addListener(this, &ofApp::onRecordingChange);
     _recording.set("recording", false);
-    
     _selectedNdiDevice.addListener(this, &ofApp::onNDIDeviceChange);
     _selectedNdiDevice.set("ndiDevice", 0);
+    _selectedVideoGrabberDevice.addListener(this, &ofApp::onVideoGrabberDeviceChange);
+    _selectedVideoGrabberDevice.set("videoGrabberDevice", 0);
 
-    ofSetBackgroundColor(ofColor(32,32,32));
 
 
 
     _selectedVideoIndex = -1;
-
-    ofFile file("config.json");
-    if (file.exists())
-    {
-        file >> _config;
-        ofLogNotice("") << "successfully loaded config";
-        ofLogNotice() << _config.dump(2);
-    }
 
     _modeLabels.push_back("NDI grabber");
     _modeLabels.push_back("video player");
@@ -87,24 +80,18 @@ void ofApp::setup()
         addVideo(ofFilePath::join(ofFilePath::getEnclosingDirectory(dir.getAbsolutePath()), dir.getPath(i)));
     }
     _videoPlayer.setPaused(true);
-    _loop = _config["loopVideos"];
-    if (!_loop)
-    {
-        _videoPlayer.setLoopState(OF_LOOP_NONE);
-    }
 
     setupGui();
     connectToArduino();
-    
-    ofLogNotice() << "available video grabbers";
-    _videoGrabber.listDevices();
+    updateVideoGrabberList();
 }
 
 void ofApp::update()
 {
     auto frameNumber = ofGetFrameNum();
-    if(frameNumber % 120 == 0){
-        updateSerialDeviceList();
+    if(frameNumber % 600 == 0){
+//        updateSerialDeviceList();
+//        updateVideoGrabberList();
     }
     // _client.update();
     std::string message;
@@ -242,11 +229,29 @@ void ofApp::draw()
                 {
                     for (auto i = 0; i < _ndiGrabberDevices.size(); i++)
                     {
-                        bool is_selected = (_selectedNdiDevice == i); // You can store your selection however you want, outside or inside your objects
+                        bool is_selected = (_selectedNdiDevice == i);
                         if (ImGui::Selectable(_ndiGrabberDevices[i].deviceName.c_str()), is_selected)
                             _selectedNdiDevice = i;
                         if (is_selected)
-                            ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+            if(_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER && !_ndiGrabberDevices.empty()){
+                std::string text = "not selected";
+                if(_selectedVideoGrabberDevice >=  0 && _selectedVideoGrabberDevice < _videoGrabberDevices.size()){
+                    text = _videoGrabberDevices[_selectedVideoGrabberDevice].deviceName;
+                }
+                if (ImGui::BeginCombo("video grabber", text.c_str()))
+                {
+                    for (auto i = 0; i < _videoGrabberDevices.size(); i++)
+                    {
+                        bool is_selected = (_selectedVideoGrabberDevice == i);
+                        if (ImGui::Selectable(_videoGrabberDevices[i].deviceName.c_str()), is_selected)
+                            _selectedVideoGrabberDevice = i;
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
@@ -304,7 +309,8 @@ void ofApp::draw()
     {
         previewSize.y = (_videoPlayer.getHeight() / _videoPlayer.getWidth()) * previewSize.x;
         _videoPlayer.draw(0, 0, previewSize.x, previewSize.y);
-        ofDrawRectangle(0, previewSize.y+padding, _videoPlayer.getPosition()*previewSize.x, 10);
+        auto playheadHeight = 5;
+        ofDrawRectangle(0, previewSize.y, _videoPlayer.getPosition()*previewSize.x, playheadHeight);
     }
     else if(_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER)
     {
@@ -341,10 +347,14 @@ void ofApp::draw()
     }
 
 // ##### draw library
+    auto libraryWindowPosition = glm::vec2(ofGetWidth()/2 + padding, settingsWindowPosition.y + settingsWindowSize.y + padding);
+    auto libraryWindowSize = glm::vec2(ofGetWidth()/2 - 2*padding, previewSize.y);
+
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            ImGui::SetNextWindowPos(glm::vec2(ofGetWidth()/2 + padding, settingsWindowPosition.y + settingsWindowSize.y + padding)); 
-            ImGui::SetNextWindowSize(glm::vec2(ofGetWidth()/2 - 2*padding, 0)); 
-            if (ImGui::Begin("library")){
+            ImGui::SetNextWindowPos(libraryWindowPosition);
+            ImGui::SetNextWindowSize(libraryWindowSize);
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+            if (ImGui::Begin("library", NULL, flags)){
                 std::vector<std::string> videoLabels;
                 for(auto & file : _videoFiles){
                     videoLabels.push_back(ofFilePath::getBaseName(file));
@@ -368,12 +378,15 @@ void ofApp::draw()
                     }
                 }
             }
+//            libraryWindowSize = ImGui::GetWindowSize();
             ImGui::End();
         }
 
 // ##### draw player controls
+    auto playerControlsWindowSize = glm::vec2(0,0);
+    auto playerControlsWindowPosition = glm::vec2(previewPosition.x,  previewPosition.y + previewSize.y + padding);
         if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
-            ImGui::SetNextWindowPos(glm::vec2(previewPosition.x,  previewPosition.y + previewSize.y + 10 + padding)); 
+            ImGui::SetNextWindowPos(playerControlsWindowPosition);
             ImGui::SetNextWindowSize(glm::vec2(previewSize.x, 0)); 
             if (ImGui::Begin("controls")){
                 if(ImGui::Button("stop"))
@@ -415,8 +428,31 @@ void ofApp::draw()
                     _mute = muteValue;
                 }
             }
+            playerControlsWindowSize = ImGui::GetWindowSize();
             ImGui::End();
         }
+    
+    // ##### recorder controls
+            if(_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER){
+                ImGui::SetNextWindowPos(glm::vec2(libraryWindowPosition.x,  playerControlsWindowPosition.y));
+            }else{
+                ImGui::SetNextWindowPos(glm::vec2(libraryWindowPosition.x,  previewPosition.y));
+            }
+    // + previewSize.y + 10 + padding)
+                ImGui::SetNextWindowSize(glm::vec2(previewSize.x, 0));
+                if (ImGui::Begin("recorder")){
+                    bool recordingValue = _recording.get();
+                    if(ImGui::Checkbox("recording", &recordingValue)){
+                        _recording = recordingValue;
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::Button("save")){
+                        saveCurrentRecording();
+                    }
+                }
+                ImGui::End();
+            
+
 
 //    ImGui::ShowStyleEditor();
     gui.end();
@@ -697,7 +733,7 @@ void ofApp::dragEvent(ofDragInfo info)
         if (ofToLower(file.getExtension()) == "mov" || ofToLower(file.getExtension()) == "mp4")
         {
             addVideo(filePath);
-            // _mode = INPUTMODE::INPUTMODE_VIDEOPLAYER;
+             _mode = INPUTMODE::INPUTMODE_VIDEOPLAYER;
         }
         else if (ofToLower(file.getExtension()) == "svg")
         {
@@ -836,6 +872,31 @@ void ofApp::previousVideo(){
     loadVideoByIndex(_selectedVideoIndex - 1, _loop);
 }
 
+void ofApp::saveCurrentRecording(){
+    auto result = ofSystemSaveDialog("animation.json", "choose destination");
+    if(result.bSuccess) {
+      std::string path = result.getPath();
+        auto basename = ofFilePath::getBaseName(path);
+        auto extension = ofFilePath::getFileExt(path);
+//        if(extension == ".json"){
+            saveCurrentRecording(path);
+//        }
+    }
+}
+void ofApp::saveCurrentRecording(std::string path){
+    ofLogNotice() << "save recording to " << path;
+
+    ofFile output;
+    output.create();
+    output.open(path, ofFile::WriteOnly);
+    output << _recordedAnimation.dump();
+    output.close();
+}
+
+void ofApp::exportVideo(std::string path){
+//    _exportVideoPlayer.loadSync(path);
+}
+
 void ofApp::onSerialBuffer(const ofx::IO::SerialBufferEventArgs &args)
 {
     ofLogNotice() << "Serial message " << args.buffer().toString();
@@ -857,8 +918,9 @@ void ofApp::onModeChange(int & value){
         case INPUTMODE::INPUTMODE_NDIGRABBER: {
             _videoGrabber.close();
             stopPlayer();
-            _ndiGrabber.setDevice(_ndiGrabberDevices[_selectedNdiDevice]);
-
+            if(_selectedNdiDevice >= 0 && _selectedNdiDevice < _ndiGrabberDevices.size()){
+                _ndiGrabber.setDevice(_ndiGrabberDevices[_selectedNdiDevice]);
+            }
         }
         default: {
             _videoGrabber.close();
@@ -888,5 +950,14 @@ void ofApp::onRecordingChange(bool & value){
 void ofApp::onNDIDeviceChange(int & value){
     if(value >= 0 && value < _ndiGrabberDevices.size()){
         _ndiGrabber.setDevice(_ndiGrabberDevices[value]);
+    }
+}
+
+void ofApp::onVideoGrabberDeviceChange(int & value){
+    ofLogNotice() << "video grabber device changed " << value;
+    if(value >= 0 && value < _videoGrabberDevices.size()){
+        
+        _videoGrabber.close();
+        _videoGrabber.setDeviceID(value);
     }
 }
