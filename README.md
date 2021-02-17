@@ -28,7 +28,15 @@ luce diretta parses the **svg**'s direct children of type **rect** and uses thei
 ```
 
 It might be neccessary to adapt the mask to fit the rules above, e.g. remove wrapper tags, sketch usually adds a wrapping **g** tag.
+## Building
+### osx
+Xcode needs an extra run script to fix the rpath issue with dynamic libs. 
 
+```
+cp "./local_addons/ofxNDI/libs/libndi/lib/osx_x64/libndi.3.dylib"  "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/"
+install_name_tool -change @rpath/libndi.3.dylib @executable_path/libndi.3.dylib "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/$PRODUCT_NAME";
+
+```
 ## Dependencies
 ### Arduino
     - Neopixel: https://github.com/adafruit/Adafruit_NeoPixel
