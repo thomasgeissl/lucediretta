@@ -14,6 +14,7 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel (TOTAL_NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 PacketSerial packetSerial;
+bool dirty;
 
 void setup() {
   strip.begin();
@@ -31,10 +32,14 @@ void loop() {
   if (packetSerial.overflow())
   {
   }
-  strip.show();
+  if(dirty){
+    strip.show();
+    dirty = false;
+  }
 }
 
 void onPacketReceived(const uint8_t* buffer, size_t size)
 {
   strip.setPixelColor(buffer[0] + LED_OFFSET, buffer[1], buffer[2], buffer[3]);
+  dirty = true;
 }
