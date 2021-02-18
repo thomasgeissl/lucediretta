@@ -46,8 +46,6 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     _selectedVideoGrabberDevice.set("videoGrabberDevice", 0);
 
 
-
-
     _selectedVideoIndex = -1;
 
     _modeLabels.push_back("NDI grabber");
@@ -124,6 +122,8 @@ void ofApp::update()
     else if (_mode == INPUTMODE::INPUTMODE_VIDEOPLAYER)
     {
         _videoPlayer.update();
+        ofLogNotice() << _videoPlayer.getDuration();
+        ofLogNotice() << _videoPlayer.getPosition();
         if (_videoPlayer.isFrameNew())
         {
             isNewFrame = true;
@@ -137,6 +137,11 @@ void ofApp::update()
 
                 _newLedPixels[i] = color;
             }
+        }
+        
+        if(_recording && _videoPlayer.getIsMovieDone()){
+            _recording = false;
+            saveCurrentRecording();
         }
     }
     else if (_mode == INPUTMODE::INPUTMODE_VIDEOGRABBER)
@@ -418,6 +423,14 @@ void ofApp::draw()
                     nextVideo();
                 }
                 ImGui::SameLine();
+                 if(ImGui::Button("export"))
+                 {
+                    _videoPlayer.stop();
+                    _recording = true;
+                    _loop = false;
+                    _videoPlayer.play();
+                 }
+                 ImGui::SameLine();
                 bool loopValue = _loop.get();
                 if(ImGui::Checkbox("loop", &loopValue)){
                     _loop = loopValue;
@@ -873,7 +886,7 @@ void ofApp::previousVideo(){
 }
 
 void ofApp::saveCurrentRecording(){
-    auto result = ofSystemSaveDialog("animation.h", "choose destination");
+    auto result = ofSystemSaveDialog("luce.h", "choose destination");
     if(result.bSuccess) {
       std::string path = result.getPath();
         auto basename = ofFilePath::getBaseName(path);
@@ -902,14 +915,17 @@ void ofApp::saveCurrentRecording(std::string path){
     createFunctionCode += "(){\n";
     
     auto frameCounter = 0;
+    auto maxPixelCounter = 0;
     for(auto frame : _recordedAnimation){
         if(!frame["pixels"].empty()){
             frameCounter++;
-            createFunctionCode += name+".addNewFrame(";
+            createFunctionCode += "\t"+name+".addNewFrame(";
             createFunctionCode += ofToString(frame["time"].get<int>());
             createFunctionCode += ");\n";
+            auto pixelCounter = 0;
             for(auto pixel : frame["pixels"]){
-                createFunctionCode += name+".addPixelToLastFrame(";
+                pixelCounter++;
+                createFunctionCode += "\t"+name+".addPixelToLastFrame(";
                 createFunctionCode += ofToString(pixel["index"].get<int>());
                 createFunctionCode += ",";
                 createFunctionCode += ofToString(pixel["r"].get<int>());
@@ -919,13 +935,14 @@ void ofApp::saveCurrentRecording(std::string path){
                 createFunctionCode += ofToString(pixel["b"].get<int>());
                 createFunctionCode += ");\n";
             }
+            maxPixelCounter = max(maxPixelCounter, pixelCounter);
         }
     }
     createFunctionCode += "}";
     
     std::string code = "#pragma once\n";
     code += "#include \"./Animation.h\"\n";
-    code += "static Animation<"+ofToString(frameCounter)+"> ";
+    code += "static Animation<"+ofToString(frameCounter)+", "+ofToString(maxPixelCounter)+"> ";
     code += name + ";\n\n";
     
     output << code;

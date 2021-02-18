@@ -14,7 +14,7 @@ bool dirty;
 
 void setup() {
   strip.begin();
-  strip.setBrightness(96);
+  strip.setBrightness(127);
   strip.clear();
   strip.show();
 

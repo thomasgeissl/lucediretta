@@ -1,7 +1,7 @@
 #include "./defines.h"
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-#include "./startAnimation.h"
+#include "./demoAnimation.h"
 
 #ifdef __AVR__
 #include <avr/power.h>
@@ -16,10 +16,10 @@ void setup() {
   strip.clear();
   strip.show();
 
-  create_startAnimation();
-  startAnimation.trigger(strip);
+  create_demoAnimation();
 
 }
 
 void loop() {
+    demoAnimation.trigger(strip);
 }
