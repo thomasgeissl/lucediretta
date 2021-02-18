@@ -3,6 +3,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <PacketSerial.h>
 
+#include "./startAnimation.h"
+
 #ifdef __AVR__
 #include <avr/power.h>
 #endif
@@ -18,20 +20,24 @@ void setup() {
   strip.clear();
   strip.show();
 
-  packetSerial.begin(115200);
-  packetSerial.setPacketHandler(&onPacketReceived);
+//  packetSerial.begin(115200);
+//  packetSerial.setPacketHandler(&onPacketReceived);
+
+  create_startAnimation();
 }
 
 void loop() {
-  packetSerial.update();
+  startAnimation.trigger(strip);
 
-  if (packetSerial.overflow())
-  {
-  }
-  if (dirty) {
-    strip.show();
-    dirty = false;
-  }
+//  packetSerial.update();
+//
+//  if (packetSerial.overflow())
+//  {
+//  }
+//  if (dirty) {
+//    strip.show();
+//    dirty = false;
+//  }
 }
 
 void onPacketReceived(const uint8_t* buffer, size_t size)
