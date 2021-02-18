@@ -278,9 +278,9 @@ void ofApp::draw()
             
             if(ImGui::Button("load mask"))
             {
-                ofFileDialogResult result = ofSystemLoadDialog("load svg mask");
+                ofFileDialogResult result = ofSystemLoadDialog("load svg mask", true);
                 if(result.bSuccess) {
-                  std::string path = result.getPath();
+                    std::string path = result.getPath();
                     auto basename = ofFilePath::getBaseName(path);
                     auto extension = ofFilePath::getFileExt(path);
                     if(extension == ".svg"){
@@ -372,14 +372,29 @@ void ofApp::draw()
                 
                 if(ImGui::Button("add"))
                 {
-                    ofFileDialogResult result = ofSystemLoadDialog("add video");
+                    ofFileDialogResult result = ofSystemLoadDialog("add video", true);
                     if(result.bSuccess) {
-                      std::string path = result.getPath();
+                        std::string path = result.getPath();
                         auto basename = ofFilePath::getBaseName(path);
                         auto extension = ofFilePath::getFileExt(path);
-                        if(extension == "mp4" || extension == "mov"){
-                            addVideo(path);
+                        if(ofDirectory::doesDirectoryExist(path)){
+                            ofDirectory dir(path);
+                            dir.listDir();
+                            for(auto file : dir.getFiles()){
+                                auto path = file.getAbsolutePath();
+                                auto basename = ofFilePath::getBaseName(path);
+                                auto extension = ofFilePath::getFileExt(path);
+                                if(extension == "mp4" || extension == "mov"){
+                                    addVideo(path);
+                                }
+                            }
+                            
+                        }else{
+                            if(extension == "mp4" || extension == "mov"){
+                                addVideo(path);
+                            }
                         }
+
                     }
                 }
             }
