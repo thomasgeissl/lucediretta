@@ -1,0 +1,4 @@
+#define LED_PIN 6
+#define LED_OFFSET 0
+#define NUM_LEDS 1 + 24 + 64 +64 + 24
+#define TOTAL_NUM_LEDS NUM_LEDS+LED_OFFSET

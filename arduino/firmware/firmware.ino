@@ -1,18 +1,16 @@
+#include "./defines.h"
+#include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
 #include <PacketSerial.h>
 
-#include<Arduino.h>
+#include "./startAnimation.h"
+
 #ifdef __AVR__
 #include <avr/power.h>
 #endif
 
-#define LED_PIN 6
-#define LED_OFFSET 0
-#define NUM_LEDS 1 + 24 + 64 +64 + 24
-#define TOTAL_NUM_LEDS NUM_LEDS+LED_OFFSET
 
-#include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip = Adafruit_NeoPixel (TOTAL_NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
 PacketSerial packetSerial;
 bool dirty;
 
@@ -24,6 +22,9 @@ void setup() {
 
   packetSerial.begin(115200);
   packetSerial.setPacketHandler(&onPacketReceived);
+
+  create_startAnimation();
+  startAnimation.trigger(strip);
 }
 
 void loop() {
@@ -32,7 +33,7 @@ void loop() {
   if (packetSerial.overflow())
   {
   }
-  if(dirty){
+  if (dirty) {
     strip.show();
     dirty = false;
   }

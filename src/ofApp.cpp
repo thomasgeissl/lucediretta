@@ -826,8 +826,8 @@ void ofApp::sendSerial()
                     auto pixel = ofJson::object();
                     pixel["index"] = x;
                     pixel["r"] = newColor.r;
-                    pixel["g"] = newColor.r;
-                    pixel["b"] = newColor.r;
+                    pixel["g"] = newColor.g;
+                    pixel["b"] = newColor.b;
                     object["pixels"].push_back(pixel);
                 }
             }
@@ -873,7 +873,7 @@ void ofApp::previousVideo(){
 }
 
 void ofApp::saveCurrentRecording(){
-    auto result = ofSystemSaveDialog("animation.json", "choose destination");
+    auto result = ofSystemSaveDialog("animation.h", "choose destination");
     if(result.bSuccess) {
       std::string path = result.getPath();
         auto basename = ofFilePath::getBaseName(path);
@@ -885,12 +885,54 @@ void ofApp::saveCurrentRecording(){
 }
 void ofApp::saveCurrentRecording(std::string path){
     ofLogNotice() << "save recording to " << path;
+    auto name = ofFilePath::getBaseName(path);
+    ofLogNotice() << name;
 
     ofFile output;
     output.create();
     output.open(path, ofFile::WriteOnly);
-    output << _recordedAnimation.dump();
+//    output << _recordedAnimation.dump();
+    
+
+    
+
+
+    std::string createFunctionCode = "void create_";
+    createFunctionCode += name;
+    createFunctionCode += "(){\n";
+    
+    auto frameCounter = 0;
+    for(auto frame : _recordedAnimation){
+        if(!frame["pixels"].empty()){
+            frameCounter++;
+            createFunctionCode += name+".addNewFrame(";
+            createFunctionCode += ofToString(frame["time"].get<int>());
+            createFunctionCode += ");\n";
+            for(auto pixel : frame["pixels"]){
+                createFunctionCode += name+".addPixelToLastFrame(";
+                createFunctionCode += ofToString(pixel["index"].get<int>());
+                createFunctionCode += ",";
+                createFunctionCode += ofToString(pixel["r"].get<int>());
+                createFunctionCode += ",";
+                createFunctionCode += ofToString(pixel["g"].get<int>());
+                createFunctionCode += ",";
+                createFunctionCode += ofToString(pixel["b"].get<int>());
+                createFunctionCode += ");\n";
+            }
+        }
+    }
+    createFunctionCode += "}";
+    
+    std::string code = "#pragma once\n";
+    code += "#include \"./Animation.h\"\n";
+    code += "static Animation<"+ofToString(frameCounter)+"> ";
+    code += name + ";\n\n";
+    
+    output << code;
+    output << createFunctionCode;
+
     output.close();
+
 }
 
 void ofApp::exportVideo(std::string path){
