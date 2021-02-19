@@ -3,7 +3,7 @@ This is a work in progress and mostly broken.
 
 videoplayer input            |  NDI grabber input
 :-------------------------:|:-------------------------:
-![](docs/ScreenshotVideoPlayer.png)  |  ![](docs/ScreenshotNDIGrabber.png))
+![](docs/ScreenshotVideoPlayer.png)  |  ![](docs/ScreenshotNDIGrabber.png)
 
 
 
