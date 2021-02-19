@@ -2,8 +2,8 @@
 This is a work in progress and mostly broken.
 
 
-![](docs/Screenshot 2021-02-19 at 10.32.06.png)
-![](docs/Screenshot 2021-02-19 at 10.32.52.png)
+![](docs/ScreenshotVideoPlauer.png)
+![](docs/ScreenshotNDIGrabber.png)
 
 luce diretta will be your friend if you need to design led animations and wanna preview them directly on led strips instead of screens.
 It can work with ndi streams, rendered video files, web cam input and syphon. 
