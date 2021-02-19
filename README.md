@@ -1,9 +1,14 @@
 # luce diretta - direct light
 This is a work in progress and mostly broken.
 
+videoplayer input            |  NDI grabber input
+:-------------------------:|:-------------------------:
+![](docs/ScreenshotVideoPlayer.png)  |  ![](docs/ScreenshotNDIGrabber.png)png)
 
-![](docs/ScreenshotVideoPlayer.png)
-![](docs/ScreenshotNDIGrabber.png)
+
+
+
+
 
 luce diretta will be your friend if you need to design led animations and wanna preview them directly on led strips instead of screens.
 It can work with ndi streams, rendered video files, web cam input and syphon. 
