@@ -2,7 +2,7 @@
 This is a work in progress and mostly broken.
 
 
-![](docs/ScreenshotVideoPlauer.png)
+![](docs/ScreenshotVideoPlayer.png)
 ![](docs/ScreenshotNDIGrabber.png)
 
 luce diretta will be your friend if you need to design led animations and wanna preview them directly on led strips instead of screens.
