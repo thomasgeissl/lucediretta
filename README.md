@@ -1,6 +1,8 @@
 # luce diretta - direct light
 This is a work in progress and mostly broken.
 
+![](docs/demo.gif)
+
 videoplayer input            |  NDI grabber input
 :-------------------------:|:-------------------------:
 ![](docs/ScreenshotVideoPlayer.png)  |  ![](docs/ScreenshotNDIGrabber.png)
