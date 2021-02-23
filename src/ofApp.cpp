@@ -44,6 +44,10 @@ ofApp::ofApp(INPUTMODE mode, std::string mask)
     _selectedNdiDevice.set("ndiDevice", 0);
     _selectedVideoGrabberDevice.addListener(this, &ofApp::onVideoGrabberDeviceChange);
     _selectedVideoGrabberDevice.set("videoGrabberDevice", 0);
+    
+    _serialPort.addListener(this, &ofApp::onSerialPortChange);
+    _serialPort.set("serialPort", "");
+    
 
 
     _selectedVideoIndex = -1;
@@ -206,7 +210,7 @@ void ofApp::draw()
 {
     auto padding = ofGetWidth()*0.01;
 
-    gui.begin();
+    _gui.begin();
     auto settings = ofxImGui::Settings();
     auto settingsWindowPosition = glm::vec2(padding, padding);
     auto settingsWindowSize = glm::vec2(0, 0);
@@ -215,6 +219,7 @@ void ofApp::draw()
     ImGui::SetNextWindowSize(glm::vec2(ofGetWidth() - 2*padding, 0)); 
 
         if (ImGui::Begin("settings")){
+            ImGui::PushItemWidth(ImGui::GetWindowContentRegionWidth()/2);
 
             if (ImGui::BeginCombo("mode", _modeLabels[_mode].c_str()))
             {
@@ -228,7 +233,7 @@ void ofApp::draw()
                 }
                 ImGui::EndCombo();
             }
-            // ImGui::SameLine();
+//            ImGui::SameLine();
             if(_mode == INPUTMODE::INPUTMODE_NDIGRABBER && !_ndiGrabberDevices.empty()){
                 if (ImGui::BeginCombo("ndi device", _ndiGrabberDevices[_selectedNdiDevice].deviceName.c_str()))
                 {
@@ -263,15 +268,16 @@ void ofApp::draw()
             }
             // ImGui::SameLine();
 
-            if (!_serialDevices.empty() && ImGui::BeginCombo("serial", _serialDevices[_selectedSerialDevice].port().c_str()))
+            if (!_serialDevices.empty() && ImGui::BeginCombo("serial port", _serialPort.get().c_str()))
             {
-                for (auto i = 0; i < _serialDevices.size(); i++)
-                {
-                    bool is_selected = (_selectedSerialDevice == i); // You can store your selection however you want, outside or inside your objects
-                    if (ImGui::Selectable(_serialDevices[i].port().c_str(), is_selected))
-                        _selectedSerialDevice = i;
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                for(auto & port : _serialDeviceLabels){
+                    auto isSelected = port == _serialPort.get();
+                    if (ImGui::Selectable(port.c_str(), isSelected)){
+                        _serialPort = port;
+                    }
+                    if (isSelected){
+                        ImGui::SetItemDefaultFocus();
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -283,7 +289,7 @@ void ofApp::draw()
                     std::string path = result.getPath();
                     auto basename = ofFilePath::getBaseName(path);
                     auto extension = ofFilePath::getFileExt(path);
-                    if(extension == ".svg"){
+                    if(extension == "svg"){
                         loadMask(path);
                     }
                 }
@@ -483,7 +489,7 @@ void ofApp::draw()
 
 
 //    ImGui::ShowStyleEditor();
-    gui.end();
+    _gui.end();
 }
 
 void ofApp::exit()
@@ -506,7 +512,7 @@ void ofApp::exit()
             // attention: wild cast here, assumption x < 256
             std::vector<uint8_t> data = {(unsigned char)(i), 0, 0, 0};
             ofx::IO::ByteBuffer buffer(data);
-            _device.send(buffer);
+            _serialDevice.send(buffer);
         }
         catch (...)
         {
@@ -610,17 +616,17 @@ bool ofApp::connectToArduino()
     {
         if ((ofToLower(device.getDescription()).find("arduino") != std::string::npos) || (ofToLower(device.getDescription()).find("usb serial device") != std::string::npos) || (ofToLower(device.getDescription()).find("teensyduino") != std::string::npos))
         {
-            _device.setup(device.port(), 115200);
+            _serialPort = device.port();
         }
     }
-    auto success = _device.isOpen();
+    auto success = _serialDevice.isOpen();
     if (success)
     {
-        ofLogNotice("led animation toolkit") << "successfully opened serial connection";
+        ofLogNotice("") << "successfully opened serial connection";
     }
     else
     {
-        ofLogError("led animation toolkit") << "could not connect to serial device";
+        ofLogError("") << "could not connect to serial device";
     }
     return success;
 }
@@ -632,24 +638,24 @@ bool ofApp::connectToArduino(std::string description)
     {
         if (ofToLower(device.description()) == ofToLower(description))
         {
-            auto success = _device.setup(devicesInfo[0], 115200);
+            auto success = _serialDevice.setup(devicesInfo[0], 115200);
 
             if (success)
             {
-                _device.registerAllEvents(this);
-                ofLogNotice("ofApp::setup") << "Successfully setup " << devicesInfo[0];
+                _serialDevice.registerAllEvents(this);
+                ofLogNotice() << "Successfully setup " << devicesInfo[0];
             }
             else
             {
-                ofLogNotice("ofApp::setup") << "Unable to setup " << devicesInfo[0];
+                ofLogNotice() << "Unable to setup " << devicesInfo[0];
             }
         }
     }
-    auto success = _device.setup(devicesInfo[0], 115200);
+    auto success = _serialDevice.setup(devicesInfo[0], 115200);
 
     if (success)
     {
-        _device.registerAllEvents(this);
+        _serialDevice.registerAllEvents(this);
         ofLogNotice("") << "Successfully setup " << devicesInfo[0];
     }
     else
@@ -786,6 +792,10 @@ void ofApp::clearVideos()
 void ofApp::updateSerialDeviceList()
 {
     _serialDevices = ofx::IO::SerialDeviceUtils::listDevices();
+    _serialDeviceLabels.clear();
+    for(auto & device : _serialDevices){
+        _serialDeviceLabels.push_back(device.getPort());
+    }
 }
 
 void ofApp::updateNDIGrabberList()
@@ -800,7 +810,7 @@ void ofApp::updateVideoGrabberList()
 
 void ofApp::setupGui()
 {
-    gui.setup();
+    _gui.setup();
     ImGui::CreateContext();
     auto io = ImGui::GetIO();
     auto font = io.Fonts->AddFontDefault();
@@ -826,7 +836,7 @@ void ofApp::setupGui()
     
     ImGui::GetIO().MouseDrawCursor = false;
 
-    gui.setTheme(new Theme());
+    _gui.setTheme(new Theme());
 }
 
 
@@ -849,7 +859,7 @@ void ofApp::sendSerial()
                 // attention: wild cast here, assumption x < 256
                 std::vector<uint8_t> data = {(unsigned char)(x), newColor.r, newColor.g, newColor.b};
                 ofx::IO::ByteBuffer buffer(data);
-                _device.send(buffer);
+                _serialDevice.send(buffer);
                 if(_recording){
                     auto pixel = ofJson::object();
                     pixel["index"] = x;
@@ -1033,5 +1043,18 @@ void ofApp::onVideoGrabberDeviceChange(int & value){
         
         _videoGrabber.close();
         _videoGrabber.setDeviceID(value);
+    }
+}
+
+void ofApp::onSerialPortChange(std::string & value){
+    ofLogNotice() << "serial port changed " << value;
+    if(value.empty()){
+    }else{
+        auto success = _serialDevice.setup(value, 115200);
+        if(success){
+            ofLogNotice() << "successfully opened port " << value;
+        }else{
+            ofLogNotice() << "could not open port " << value;
+        }
     }
 }

@@ -82,7 +82,7 @@ public:
     ofJson _recordedAnimation;
     uint64_t _recordingStartedTimestamp;
 
-    ofxIO::PacketSerialDevice _device;
+    ofxIO::PacketSerialDevice _serialDevice;
 
     ofParameterGroup _parameters;
     ofParameter<bool> _loop;
@@ -95,9 +95,10 @@ public:
     std::vector<std::string> _videoFiles;
     int _selectedVideoIndex;
 
-    ofxImGui::Gui gui;
+    ofxImGui::Gui _gui;
     std::vector<ofx::IO::SerialDeviceInfo> _serialDevices;
-    int _selectedSerialDevice;
+    std::vector<std::string> _serialDeviceLabels;
+    ofParameter<std::string> _serialPort;
 
     void setupGui();
     void updateSerialDeviceList();
@@ -122,5 +123,5 @@ public:
     
     void onNDIDeviceChange(int & value);
     void onVideoGrabberDeviceChange(int & value);
-
+    void onSerialPortChange(std::string & value);
 };
