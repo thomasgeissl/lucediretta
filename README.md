@@ -54,3 +54,4 @@ install_name_tool -change @rpath/libndi.3.dylib @executable_path/libndi.3.dylib 
 ### Arduino
     - Neopixel: https://github.com/adafruit/Adafruit_NeoPixel
     - PaketSerial: https://github.com/bakercp/PacketSerial
+    - Array: https://github.com/janelia-arduino/Array
