@@ -50,6 +50,9 @@ cp "./local_addons/ofxNDI/libs/libndi/lib/osx_x64/libndi.3.dylib"  "$TARGET_BUIL
 install_name_tool -change @rpath/libndi.3.dylib @executable_path/libndi.3.dylib "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/$PRODUCT_NAME";
 
 ```
+### NDI 
+- https://ndi.tv/tools/
+
 ## Dependencies
 ### Arduino
     - Neopixel: https://github.com/adafruit/Adafruit_NeoPixel
